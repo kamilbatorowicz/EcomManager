@@ -16,7 +16,7 @@ Docelowy przepływ:
 
 ## Aktualny stan i MVP
 
-Repozytorium zawiera konfigurację lokalnego środowiska i dokumentację. Backend, frontend, integracje i algorytmy biznesowe nie zostały jeszcze zaimplementowane. Opis funkcjonalności poniżej określa planowany zakres systemu.
+Repozytorium zawiera lokalną bazę PostgreSQL, szkielet backendu Spring Boot oraz frontend React z Vite i Tailwind CSS. Integracje, katalog produktów i algorytmy biznesowe nie zostały jeszcze zaimplementowane. Opis funkcjonalności poniżej określa planowany zakres systemu.
 
 Pierwsza wersja obejmie jedno źródło danych, kalkulator ceny i aktualizację produktu w WooCommerce na zewnętrznym hostingu. Kolejne integracje, zestawy i prognozy zostaną dodane po uruchomieniu pełnego przepływu dla jednego produktu.
 
@@ -131,7 +131,7 @@ Podstawowe planowane encje to `Product`, `SupplierOffer`, `SalesOffer`, `PriceRu
 - Internet przy pierwszym pobraniu obrazu PostgreSQL oraz do komunikacji ze sklepem.
 - Wolny port `5432` lub inny ustawiony w `.env`.
 
-Java 21 oraz Node.js będą potrzebne po dodaniu aplikacji. Compose uruchamia obecnie wyłącznie infrastrukturę.
+Do uruchomienia aplikacji potrzebne są Java 21, Maven 3.6.3+ oraz Node.js 22.12+ (lub 20.19+) z npm. Compose uruchamia obecnie wyłącznie PostgreSQL.
 
 ### 1. Ustawienia środowiska
 
@@ -184,7 +184,48 @@ Spring Boot uruchomiony na komputerze będzie korzystać z następujących ustaw
 | `SPRING_DATASOURCE_PASSWORD` | `POSTGRES_PASSWORD` z `.env` |
 | Adres WooCommerce | Adres HTTPS sklepu na zewnętrznym hostingu |
 
-Dostosuj porty i nazwę bazy do `.env`. Compose odczytuje ten plik automatycznie; backend na komputerze wymaga osobnego ustawienia zmiennych środowiskowych. Backend dodany w przyszłości do tej samej sieci Compose użyje hosta `postgres:5432` dla bazy. Adres zewnętrznego sklepu pozostanie taki sam. Konfiguracja integracji WooCommerce zostanie dodana wraz z implementacją backendu.
+Dostosuj porty i nazwę bazy do `.env`. Backend uruchamiany z katalogu `backend` odczytuje plik `../.env`; zmienne środowiskowe mają pierwszeństwo. Dostępne są także standardowe nadpisania `SPRING_DATASOURCE_*`. Backend dodany w przyszłości do tej samej sieci Compose użyje hosta `postgres:5432` dla bazy. Adres zewnętrznego sklepu pozostanie taki sam. Konfiguracja integracji WooCommerce zostanie dodana wraz z implementacją backendu.
+
+### 4. Uruchomienie backendu
+
+W osobnym terminalu, z katalogu repozytorium:
+
+```sh
+cd backend
+mvn spring-boot:run
+```
+
+Backend działa lokalnie na porcie `8080`. Kontrola stanu: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health). Odpowiedź `UP` oznacza poprawny stan aplikacji, w tym połączenia z PostgreSQL. Hasło bazy jest wymagane. Hibernate nie tworzy automatycznie tabel; migracje zostaną dodane z modelem domenowym.
+
+### 5. Uruchomienie frontendu
+
+W kolejnym terminalu, z katalogu repozytorium:
+
+```sh
+cd frontend
+npm ci
+npm run dev
+```
+
+Panel: [http://localhost:5173](http://localhost:5173). Vite przekazuje zapytania `/api` do lokalnego backendu, więc nie jest potrzebna otwarta konfiguracja CORS. Po zmianie portu backendu dostosuj proxy w `frontend/vite.config.js`.
+
+Panel zawiera widok startowy. Karty modułów opisują planowane funkcje, nie wykonują jeszcze operacji na ofertach. Globalne style są w `frontend/src/styles.css`.
+
+### Budowanie aplikacji
+
+W katalogu `backend`:
+
+```sh
+mvn package
+```
+
+W katalogu `frontend`:
+
+```sh
+npm run build
+```
+
+Wynikiem są plik JAR w `backend/target` i pliki strony w `frontend/dist`. Proxy Vite działa tylko podczas developmentu. Wdrożenie wymaga przekazywania żądań API do backendu przez serwer WWW oraz osobnego skonfigurowania dostępu i uwierzytelniania. Obecny szkielet jest przeznaczony do pracy lokalnej.
 
 ### Obsługa środowiska
 
@@ -224,10 +265,18 @@ docker compose down -v
 
 ```text
 EcomManager/
+├── backend/
+│   ├── pom.xml
+│   └── src/main/
+├── frontend/
+│   ├── src/
+│   ├── package.json
+│   ├── package-lock.json
+│   └── vite.config.js
 ├── .env.example
 ├── .gitignore
 ├── compose.yaml
 └── README.md
 ```
 
-Katalogi backendu i frontendu zostaną dodane wraz z ich implementacją.
+Backend i frontend mają oddzielne zależności oraz procesy uruchomienia. Sekrety integracji będą przechowywane wyłącznie po stronie backendu.
