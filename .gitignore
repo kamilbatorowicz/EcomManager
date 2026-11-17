@@ -4,6 +4,7 @@
 node_modules/
 dist/
 target/
+.m2/
 .idea/
 .vscode/
 *.log
