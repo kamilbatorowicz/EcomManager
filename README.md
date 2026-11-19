@@ -16,7 +16,7 @@ Docelowy przepływ:
 
 ## Aktualny stan i MVP
 
-Repozytorium zawiera lokalną bazę PostgreSQL, szkielet backendu Spring Boot oraz frontend React z Vite i Tailwind CSS. Integracje, katalog produktów i algorytmy biznesowe nie zostały jeszcze zaimplementowane. Opis funkcjonalności poniżej określa planowany zakres systemu.
+Repozytorium zawiera lokalną bazę PostgreSQL, backend Spring Boot oraz frontend React z Vite i Tailwind CSS. Integracja Allegro Sandbox obsługuje łączenie jednego konta przez OAuth2, odczyt jego loginu, zaszyfrowany zapis tokenów i automatyczne odświeżanie dostępu. Katalog produktów, synchronizacja ofert i algorytmy biznesowe pozostają planowane.
 
 Pierwsza wersja obejmie jedno źródło danych, kalkulator ceny i aktualizację produktu w WooCommerce na zewnętrznym hostingu. Kolejne integracje, zestawy i prognozy zostaną dodane po uruchomieniu pełnego przepływu dla jednego produktu.
 
@@ -195,7 +195,7 @@ cd backend
 mvn spring-boot:run
 ```
 
-Backend działa lokalnie na porcie `8080`. Kontrola stanu: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health). Odpowiedź `UP` oznacza poprawny stan aplikacji, w tym połączenia z PostgreSQL. Hasło bazy jest wymagane. Hibernate nie tworzy automatycznie tabel; migracje zostaną dodane z modelem domenowym.
+Backend działa lokalnie na porcie `8080`. Kontrola stanu: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health). Odpowiedź `UP` oznacza poprawny stan aplikacji, w tym połączenia z PostgreSQL. Hasło bazy jest wymagane. Flyway uruchamia migracje schematu podczas startu, a Hibernate sprawdza ich zgodność z encjami.
 
 ### 5. Uruchomienie frontendu
 
@@ -211,6 +211,32 @@ Panel: [http://localhost:5173](http://localhost:5173). Vite przekazuje zapytania
 
 Panel zawiera widok startowy. Karty modułów opisują planowane funkcje, nie wykonują jeszcze operacji na ofertach. Globalne style są w `frontend/src/styles.css`.
 
+### Połączenie z Allegro Sandbox
+
+1. W aplikacji zarejestrowanej w Allegro Sandbox wybierz autoryzację przez przeglądarkę i dodaj dokładny adres przekierowania `http://localhost:8080/api/integrations/allegro/callback`.
+2. Udostępnij aplikacji zakres `allegro:api:profile:read`, wykorzystywany do odczytu konta przez `/me`.
+3. W głównym `.env` ustaw `ALLEGRO_CLIENT_ID`, `ALLEGRO_CLIENT_SECRET` oraz `ALLEGRO_USER_AGENT`. Wzór znajduje się w `.env.example`.
+4. Ustaw `ALLEGRO_TOKEN_ENCRYPTION_KEY` jako klucz Base64 z 32 losowych bajtów. W istniejącym lokalnym `.env` klucz został wygenerowany podczas dodawania tej funkcji. Dla nowej instalacji wygeneruj go w PowerShell poleceniem `[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))` i zachowaj wynik w `.env`.
+5. Uruchom PostgreSQL, backend i frontend. Po zmianach `.env` uruchom backend ponownie.
+6. Otwórz panel pod `http://localhost:5173` i kliknij **Połącz z Allegro Sandbox**. Zaloguj się do konta testowego i zaakceptuj dostęp.
+7. Po powrocie panel pokaże login połączonego konta. Powrót do `/callback` bez wcześniejszego rozpoczęcia łączenia kończy się komunikatem o nieprawidłowej sesji.
+
+Cały proces wykonuj w tej samej przeglądarce, używając hosta `localhost`, aby zachować ciasteczko sesji. Kontrola `state`, jednorazowa próba ważna 10 minut oraz PKCE wiążą odpowiedź Allegro z rozpoczętą autoryzacją.
+
+Tokeny pozostają w backendzie i są szyfrowane AES-256-GCM przed zapisem w PostgreSQL. Zachowaj klucz szyfrowania wraz z konfiguracją instalacji. Jego zmiana uniemożliwia odczyt istniejących tokenów i wymaga ponownego połączenia konta. Status API zawiera tylko stan połączenia, login i termin ważności tokena.
+
+Zadanie w tle co minutę sprawdza termin ważności tokena i odświeża go na dwie minuty przed wygaśnięciem. Nowa para tokenów zastępuje poprzednią w jednej transakcji. Blokada rekordu w bazie chroni przed równoległym odświeżaniem. Błąd przejściowy pozwala ponowić próbę, a odpowiedź `invalid_grant` wymaga ponownej autoryzacji.
+
+Ta wersja przechowuje jedno połączone konto Allegro dla całej lokalnej instalacji. Połączenie innego konta zastępuje poprzednie po poprawnym odczycie `/me`. Skonfigurowane adresy dotyczą wyłącznie Sandboxa. Do obsługi ofert dojdą osobne funkcje i odpowiednie zakresy dostępu.
+
+| Endpoint | Zastosowanie |
+| --- | --- |
+| `GET /api/integrations/allegro/status` | Status połączenia bez tokenów |
+| `POST /api/integrations/allegro/authorize` | Rozpoczęcie autoryzacji z panelu na `http://localhost:5173` |
+| `GET /api/integrations/allegro/callback` | Odbiór odpowiedzi i powrót do panelu |
+
+Przepływ jest oparty na [dokumentacji autoryzacji Allegro](https://developer.allegro.pl/tutorials/uwierzytelnianie-i-autoryzacja-zlq9e75GdIR).
+
 ### Budowanie aplikacji
 
 W katalogu `backend`:
@@ -218,6 +244,8 @@ W katalogu `backend`:
 ```sh
 mvn package
 ```
+
+Budowanie backendu uruchamia również testy autoryzacji, szyfrowanego zapisu, odświeżania i obsługi błędów. Testy używają odrębnej bazy H2 i symulowanego API Allegro, bez danych z lokalnego `.env`.
 
 W katalogu `frontend`:
 
