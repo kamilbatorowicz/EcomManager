@@ -1,3 +1,5 @@
+import AllegroIntegration from './AllegroIntegration.jsx'
+
 const modules = [
   ['01', 'Produkty i źródła', 'Powiązania produktów dostawców z Twoimi ofertami.'],
   ['02', 'Reguły cenowe', 'Marże, prowizje i bezpieczna cena minimalna.'],
@@ -21,6 +23,7 @@ export default function App() {
           <h1 id="page-title">Wiele kanałów.<br />Jedno miejsce zarządzania.</h1>
           <p className="intro">Połącz źródła produktów ze swoimi ofertami. Tutaj powstanie panel automatyzacji cen, dostępności i synchronizacji.</p>
         </section>
+        <AllegroIntegration />
         <section className="modules" aria-labelledby="modules-title">
           <div className="section-heading">
             <h2 id="modules-title">Planowane moduły</h2>

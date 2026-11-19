@@ -15,6 +15,19 @@ spring:
 server:
   address: 127.0.0.1
   port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+
+allegro:
+  client-id: ${ALLEGRO_CLIENT_ID:}
+  client-secret: ${ALLEGRO_CLIENT_SECRET:}
+  user-agent: ${ALLEGRO_USER_AGENT:}
+  token-encryption-key: ${ALLEGRO_TOKEN_ENCRYPTION_KEY:}
+  redirect-uri: http://localhost:8080/api/integrations/allegro/callback
+  frontend-uri: http://localhost:5173
 
 management:
   endpoints:
